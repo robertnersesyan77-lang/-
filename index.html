@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BMW funs website</title>
+<link rel="icon" href="bmw-black-logo-png_seeklogo-299131.png" type="image/png">
+<style>
+body {
+  font-family: system-ui;
+  background: #0f1724;
+  color: white;
+  margin: 0;
+}
+nav {
+  background: #111827;
+  display: flex;
+  justify-content: space-around;
+  padding: 10px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+nav a {
+  color: #38bdf8;
+  text-decoration: none;
+  font-weight: 600;
+}
+main {max-width: 800px; margin: 20px auto; padding: 0 12px;}
+h2 {color: #38bdf8;}
+input,textarea,button,select {
+  padding: 8px; border-radius: 8px; border:none;
+  margin-top:8px;
+}
+button {
+  background:#38bdf8; color:#0f1724; cursor:pointer;
+}
+.card {
+  background: rgba(255,255,255,0.05);
+  border-radius: 12px; padding:10px; margin-bottom:12px;
+}
+.card img, video {
+  width:100%; border-radius:10px;
+}
+.like {
+  cursor:pointer;
+  color:#38bdf8;
+}
+.profile-pic {
+  width:100px; height:100px; border-radius:50%; object-fit:cover;
+  border:3px solid #38bdf8;
+}
+.center {display:flex; flex-direction:column; align-items:center;}
+@media (max-width: 600px) {
+  nav {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  nav a {
+    margin: 4px 0;
+  }
+  .grid {
+    grid-template-columns: 1fr; /* մեկ նկար մեկ տողում */
+  }
+  .profile-pic {
+    width: 80px;
+    height: 80px;
+  }
+}
+
+</style>
+</head>
+<body>
+<nav>
+  <a href="#" onclick="showPage('home')">🏠 Home</a>
+  <a href="#" onclick="showPage('upload')">📸 Upload</a>
+  <a href="#" onclick="showPage('profile')">👤 My Profile</a>
+  <a href="#" onclick="logout()">🚪 Logout</a>
+</nav>
+
+<main id="app"></main>
+
+<script>
+const app = document.getElementById('app');
+
+let user = localStorage.getItem('currentUser');
+if(!user){
+  user = prompt("Enter your username:");
+  if(!user) user="Guest";
+  localStorage.setItem('currentUser', user);
+}
+
+function showPage(page){
+  if(page==='home') showHome();
+  if(page==='upload') showUpload();
+  if(page==='profile') showProfile(user);
+}
+
+function logout(){
+  localStorage.removeItem('currentUser');
+  location.reload();
+}
+
+// ======== HOME (Feed) ===========
+function showHome(){
+  const posts = JSON.parse(localStorage.getItem('posts')||'[]').sort(()=>Math.random()-0.5);
+  app.innerHTML = `<h2>All Posts</h2>` + posts.map((p,i)=>`
+  <div class="card">
+    ${p.type==='image' ? `<img src="${p.src}">` : `<video src="${p.src}" controls loop muted></video>`}
+    <div><b>${p.user}</b></div>
+    <span class="like" onclick="toggleLike(${i})">❤️ ${p.likes||0}</span>
+    <button onclick="openProfile('${p.user}')">View Profile</button>
+  </div>
+  `).join('');
+}
+
+// ======== UPLOAD ===========
+function showUpload(){
+  app.innerHTML = `
+  <h2>Upload Photo or Video</h2>
+  <select id="type">
+    <option value="image">Photo</option>
+    <option value="video">Video</option>
+  </select><br>
+  <input type="file" id="file" accept="image/*,video/*"><br>
+  <button onclick="savePost()">Upload</button>
+  <div id="preview"></div>`;
+  
+  document.getElementById('file').onchange = e=>{
+    const file = e.target.files[0];
+    const r = new FileReader();
+    r.onload = ev=>{
+      const type = document.getElementById('type').value;
+      document.getElementById('preview').innerHTML = 
+        type==='image' ? `<img src="${ev.target.result}" style="max-width:300px;">` :
+        `<video src="${ev.target.result}" style="max-width:300px;" controls loop muted></video>`;
+      window.uploadData = ev.target.result;
+    }
+    r.readAsDataURL(file);
+  }
+}
+
+function savePost(){
+  if(!window.uploadData){alert("Choose a file first"); return;}
+  const posts = JSON.parse(localStorage.getItem('posts')||'[]');
+  posts.push({user, type: document.getElementById('type').value, src:window.uploadData, likes:0});
+  localStorage.setItem('posts', JSON.stringify(posts));
+  alert("Post uploaded!");
+  showProfile(user);
+}
+
+// ======== PROFILE ===========
+function showProfile(username){
+  const posts = JSON.parse(localStorage.getItem('posts')||'[]').filter(p=>p.user===username);
+  const profilePic = localStorage.getItem('pfp_'+username);
+  const own = username===user;
+  
+  app.innerHTML = `
+  <div class="center">
+    <img src="${profilePic||'https://via.placeholder.com/100?text=No+Pic'}" class="profile-pic">
+    ${own ? `
+      <input type="file" id="pfp" accept="image/*">
+      <div>
+        <button onclick="savePfp()">Change Picture</button>
+        <button onclick="deletePfp()">Delete Picture</button>
+      </div>`:''}
+    <h2>${username}</h2>
+  </div>
+  <h3>Posts</h3>
+  ${posts.map((p,i)=>`
+    <div class="card">
+      ${p.type==='image'?`<img src="${p.src}">`:`<video src="${p.src}" controls loop muted></video>`}
+      <div>❤️ ${p.likes||0}</div>
+      ${own?`<button onclick="deletePost(${i})">Delete</button>`:''}
+    </div>`).join('')}`;
+}
+
+function savePfp(){
+  const file=document.getElementById('pfp').files[0];
+  if(!file){alert("Select an image first"); return;}
+  const r=new FileReader();
+  r.onload=e=>{
+    localStorage.setItem('pfp_'+user, e.target.result);
+    alert("Profile picture updated!");
+    showProfile(user);
+  }
+  r.readAsDataURL(file);
+}
+
+function deletePfp(){
+  localStorage.removeItem('pfp_'+user);
+  alert("Profile picture deleted!");
+  showProfile(user);
+}
+
+function deletePost(index){
+  const posts = JSON.parse(localStorage.getItem('posts')||'[]');
+  const myPosts = posts.filter(p=>p.user===user);
+  const toDelete = myPosts[index];
+  const newPosts = posts.filter(p=>!(p.user===user && p.src===toDelete.src));
+  localStorage.setItem('posts', JSON.stringify(newPosts));
+  alert("Post deleted!");
+  showProfile(user);
+}
+
+// ======== LIKE & VIEW OTHERS =======
+function toggleLike(i){
+  const posts = JSON.parse(localStorage.getItem('posts')||'[]');
+  posts[i].likes = (posts[i].likes||0) + 1;
+  localStorage.setItem('posts', JSON.stringify(posts));
+  showHome();
+}
+
+function openProfile(username){
+  showProfile(username);
+}
+
+// ========== INIT ===========
+showHome();
+</script>
+</body>
+</html>
